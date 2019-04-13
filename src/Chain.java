@@ -1,27 +1,29 @@
 
 public final class Chain {
 	private BlockNode head;
-	private LastBlock<Exception> handleBlock;
+//	private LastBlock<Exception> handleBlock;
 
 	private Chain() {
 	}
 
-	public static <R> BlockNode<Void, R> start(FirstBlock<R> firstBlock) {
+	public static <R> BlockNode<Void, R> start(FirstBlock<R> firstBlock, HandleBlock handleBlock) {
 		Chain c = new Chain();
 
 		BlockNode<Void, R> node = new BlockNode<>();
 		node.block = p -> firstBlock.execute();
+		node.handleBlock = handleBlock;
 		node.chain = c;
 
 		c.head = node;
 		return node;
 	}
 
-	public static <R> BlockNode<Void, R> startUI(FirstBlock<R> firstBlock) {
+	public static <R> BlockNode<Void, R> startUI(FirstBlock<R> firstBlock, HandleBlock handleBlock) {
 		Chain c = new Chain();
 
 		BlockNode<Void, R> node = new BlockNode<>();
 		node.block = p -> firstBlock.execute();
+		node.handleBlock = handleBlock;
 		node.chain = c;
 		node.runInUI = true;
 
@@ -29,10 +31,10 @@ public final class Chain {
 		return node;
 	}
 
-	public Chain handle(LastBlock<Exception> handleBlock) {
-		this.handleBlock = handleBlock;
-		return this;
-	}
+//	public Chain handle(LastBlock<Exception> handleBlock) {
+//		this.handleBlock = handleBlock;
+//		return this;
+//	}
 
 	public void execute() {
 		head.execute();
@@ -49,6 +51,7 @@ public final class Chain {
 	public static class BlockNode<Param, Result> {
 		private Param param;
 		private ChainBlock<Param, Result> block;
+		private HandleBlock handleBlock;
 		private BlockNode next;
 		private boolean runInUI;
 		private Chain chain;
@@ -56,39 +59,41 @@ public final class Chain {
 		private BlockNode() {
 		}
 
-		public <Result2> BlockNode<Result, Result2> then(ChainBlock<Result, Result2> block) {
+		public <Result2> BlockNode<Result, Result2> then(ChainBlock<Result, Result2> block, HandleBlock handleBlock) {
 			BlockNode<Result, Result2> next = new BlockNode<>();
 			next.block = block;
+			next.handleBlock = handleBlock;
 			this.next = next;
 			next.chain = chain;
 
 			return next;
 		}
 
-		public <Result2> BlockNode<Result, Result2> thenUI(ChainBlock<Result, Result2> block) {
+		public <Result2> BlockNode<Result, Result2> thenUI(ChainBlock<Result, Result2> block, HandleBlock handleBlock) {
 			BlockNode<Result, Result2> next = new BlockNode<>();
 			next.block = block;
 			next.runInUI = true;
+			next.handleBlock = handleBlock;
 			this.next = next;
 			next.chain = chain;
 
 			return next;
 		}
 
-		public Chain end(LastBlock<Result> block) {
+		public Chain end(LastBlock<Result> block, HandleBlock handleBlock) {
 			then(p -> {
 				block.execute(p);
 				return null;
-			});
+			}, handleBlock);
 
 			return chain;
 		}
 
-		public Chain endUI(LastBlock<Result> block) {
+		public Chain endUI(LastBlock<Result> block, HandleBlock handleBlock) {
 			thenUI(p -> {
 				block.execute(p);
 				return null;
-			});
+			}, handleBlock);
 
 			return chain;
 		}
@@ -102,7 +107,7 @@ public final class Chain {
 						next.execute();
 					}
 				} catch (Exception e) {
-					if (chain.handleBlock != null) chain.handleBlock.execute(e);
+					if (handleBlock != null) handleBlock.handle(e);
 					else throw e; //rethrow if no handling provided
 				}
 			};
@@ -130,8 +135,8 @@ public final class Chain {
 		void execute(Param p);
 	}
 
-	public interface HandleBlock{
-		boolean handle(Exception e);
+	public interface HandleBlock {
+		void handle(Exception e);
 	}
 	//endregion
 }
